@@ -35,6 +35,26 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
+      - name: Create temporary signing config
+        run: |
+          keytool -genkeypair -v \
+            -keystore debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -keyalg RSA -keysize 2048 -validity 10000
+          cat > signing.properties <<'EOF'
+          KEYSTORE_FILE_DEBUG=debug.keystore
+          KEYSTORE_FILE_PASSWORD_DEBUG=android
+          KEY_ALIAS_DEBUG=androiddebugkey
+          KEY_PASSWORD_DEBUG=android
+          KEYSTORE_FILE_RELEASE=debug.keystore
+          KEYSTORE_FILE_PASSWORD_RELEASE=android
+          KEY_ALIAS_RELEASE=androiddebugkey
+          KEY_PASSWORD_RELEASE=android
+          EOF
+
       - name: Match AviaSNG fixed runtime dependencies
         run: |
           python3 - <<'PY'
