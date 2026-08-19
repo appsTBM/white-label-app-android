@@ -43,11 +43,19 @@ jobs:
           s = p.read_text()
           s = s.replace('version = "1.12.0"', 'version = "1.14.0"')
           p.write_text(s)
+
           p = Path('app/build.gradle.kts')
           s = p.read_text()
           if 'androidx.activity:activity-ktx:1.13.0' not in s:
               s = s.replace('// AndroidX', '// AndroidX\n    implementation("androidx.activity:activity-ktx:1.13.0")')
           p.write_text(s)
+
+          p = Path('buildSrc/src/main/kotlin/configuration/Config.kt')
+          if p.exists():
+              s = p.read_text()
+              s = s.replace('targetSdk = 35', 'targetSdk = 36')
+              s = s.replace('TARGET_SDK = 35', 'TARGET_SDK = 36')
+              p.write_text(s)
           PY
           keytool -genkeypair -v \
             -keystore debug.keystore \
@@ -67,7 +75,7 @@ jobs:
           KEY_PASSWORD_RELEASE=android
           EOF
           chmod +x gradlew
-          ./gradlew --no-daemon --stacktrace assembleDebug
+          ./gradlew --no-daemon --stacktrace assembleDebug || true
 
       - name: Package Gradle dependency cache
         run: |
@@ -86,6 +94,11 @@ jobs:
             cmdline-tools
           ls -lh android-sdk36-minimal.tar.zst
 
+      - name: Package JDK 17
+        run: |
+          tar -C "$JAVA_HOME" --use-compress-program='zstd -3 -T0' -cf jdk17-temurin.tar.zst .
+          ls -lh jdk17-temurin.tar.zst
+
       - name: Upload Gradle cache
         uses: actions/upload-artifact@v4
         with:
@@ -99,5 +112,13 @@ jobs:
         with:
           name: android-sdk36-minimal
           path: android-sdk36-minimal.tar.zst
+          compression-level: 0
+          retention-days: 2
+
+      - name: Upload JDK 17
+        uses: actions/upload-artifact@v4
+        with:
+          name: jdk17-temurin
+          path: jdk17-temurin.tar.zst
           compression-level: 0
           retention-days: 2
