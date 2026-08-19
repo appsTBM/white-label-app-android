@@ -26,6 +26,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
@@ -119,5 +120,13 @@ jobs:
         with:
           name: jdk17-temurin
           path: jdk17-temurin.tar.zst
+          compression-level: 0
+          retention-days: 2
+
+      - name: Upload current Travel SDK AAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: travel-sdk-current-aar
+          path: travel-sdk/travel-sdk-release.aar
           compression-level: 0
           retention-days: 2
