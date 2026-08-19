@@ -1,4 +1,4 @@
-name: Export Appodeal Runtime Jars
+name: Export JSpecify Jar
 
 on:
   push:
@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 jobs:
-  export-jars:
+  export-jar:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -24,7 +24,7 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Resolve Appodeal runtime jars
+      - name: Resolve JSpecify
         run: |
           chmod +x gradlew
           mkdir -p "$RUNNER_TEMP/deps"
@@ -32,16 +32,9 @@ jobs:
           rootProject.name = 'deps'
           EOF
           cat > "$RUNNER_TEMP/deps/build.gradle" <<'EOF'
-          repositories {
-              mavenCentral()
-              maven { url 'https://artifactory.appodeal.com/appodeal' }
-              maven { url 'https://artifactory.bidmachine.io/bidmachine' }
-          }
+          repositories { mavenCentral() }
           configurations { deps }
-          dependencies {
-              deps 'com.explorestack:protobuf-java:3.16.0'
-              deps 'com.appodeal:protobuf-models:1.4.3'
-          }
+          dependencies { deps 'org.jspecify:jspecify:1.0.0' }
           tasks.register('copyDeps', Copy) {
               from configurations.deps
               into layout.buildDirectory.dir('jars')
@@ -50,9 +43,9 @@ jobs:
           cd "$RUNNER_TEMP/deps"
           "$GITHUB_WORKSPACE/gradlew" --no-daemon copyDeps
           ls -lh build/jars
-      - name: Upload jars
+      - name: Upload jar
         uses: actions/upload-artifact@v4
         with:
-          name: appodeal-runtime-jars
+          name: jspecify-runtime-jar
           path: ${{ runner.temp }}/deps/build/jars/
           retention-days: 2
