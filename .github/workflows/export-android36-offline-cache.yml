@@ -65,7 +65,7 @@ jobs:
                           it is org.gradle.api.artifacts.component.ModuleComponentIdentifier
                       }
                   }
-                  view.artifactFiles.files.sortedBy { it.name }.forEach { println(it.absolutePath) }
+                  view.files.files.sortedBy { it.name }.forEach { println(it.absolutePath) }
               }
           }
           EOF
