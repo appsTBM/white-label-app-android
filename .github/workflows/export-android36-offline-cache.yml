@@ -53,8 +53,7 @@ jobs:
           p = Path('buildSrc/src/main/kotlin/configuration/Config.kt')
           if p.exists():
               s = p.read_text()
-              s = s.replace('targetSdk = 35', 'targetSdk = 36')
-              s = s.replace('TARGET_SDK = 35', 'TARGET_SDK = 36')
+              s = s.replace('val targetSdk: Int = 35', 'val targetSdk: Int = 36')
               p.write_text(s)
           PY
           keytool -genkeypair -v \
