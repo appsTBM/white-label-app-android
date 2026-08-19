@@ -15,118 +15,49 @@ permissions:
 jobs:
   export-cache:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Restore JDK and Gradle cache
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android API 36
+      - name: Package and split Gradle cache
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
-
-      - name: Prime current Android 16 dependencies
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('gradle/libs.versions.toml')
-          s = p.read_text()
-          s = s.replace('version = "1.12.0"', 'version = "1.14.0"')
-          p.write_text(s)
-
-          p = Path('app/build.gradle.kts')
-          s = p.read_text()
-          if 'androidx.activity:activity-ktx:1.13.0' not in s:
-              s = s.replace('// AndroidX', '// AndroidX\n    implementation("androidx.activity:activity-ktx:1.13.0")')
-          p.write_text(s)
-
-          p = Path('buildSrc/src/main/kotlin/configuration/Config.kt')
-          if p.exists():
-              s = p.read_text()
-              s = s.replace('val targetSdk: Int = 35', 'val targetSdk: Int = 36')
-              p.write_text(s)
-          PY
-          keytool -genkeypair -v \
-            -keystore debug.keystore \
-            -storepass android \
-            -alias androiddebugkey \
-            -keypass android \
-            -dname "CN=Android Debug,O=Android,C=US" \
-            -keyalg RSA -keysize 2048 -validity 10000
-          cat > signing.properties <<'EOF'
-          KEYSTORE_FILE_DEBUG=debug.keystore
-          KEYSTORE_FILE_PASSWORD_DEBUG=android
-          KEY_ALIAS_DEBUG=androiddebugkey
-          KEY_PASSWORD_DEBUG=android
-          KEYSTORE_FILE_RELEASE=debug.keystore
-          KEYSTORE_FILE_PASSWORD_RELEASE=android
-          KEY_ALIAS_RELEASE=androiddebugkey
-          KEY_PASSWORD_RELEASE=android
-          EOF
-          chmod +x gradlew
-          ./gradlew --no-daemon --stacktrace assembleDebug || true
-
-      - name: Package Gradle dependency cache
-        run: |
+          du -sh "$HOME/.gradle" || true
           tar -C "$HOME" --use-compress-program='zstd -3 -T0' -cf gradle-offline-cache.tar.zst \
             .gradle/caches \
             .gradle/wrapper/dists
-          ls -lh gradle-offline-cache.tar.zst
+          split -b 450M -d -a 2 gradle-offline-cache.tar.zst gradle-cache-part-
+          ls -lh gradle-cache-part-*
 
-      - name: Package minimal Android SDK 36
-        run: |
-          tar -C "$ANDROID_SDK_ROOT" --use-compress-program='zstd -3 -T0' -cf android-sdk36-minimal.tar.zst \
-            platforms/android-36 \
-            build-tools/36.0.0 \
-            platform-tools \
-            licenses \
-            cmdline-tools
-          ls -lh android-sdk36-minimal.tar.zst
-
-      - name: Package JDK 17
-        run: |
-          tar -C "$JAVA_HOME" --use-compress-program='zstd -3 -T0' -cf jdk17-temurin.tar.zst .
-          ls -lh jdk17-temurin.tar.zst
-
-      - name: Upload Gradle cache
+      - name: Upload Gradle cache part 00
         uses: actions/upload-artifact@v4
         with:
-          name: gradle-offline-cache-api36
-          path: gradle-offline-cache.tar.zst
+          name: gradle-cache-part-00
+          path: gradle-cache-part-00
           compression-level: 0
           retention-days: 2
 
-      - name: Upload Android SDK 36
+      - name: Upload Gradle cache part 01
         uses: actions/upload-artifact@v4
         with:
-          name: android-sdk36-minimal
-          path: android-sdk36-minimal.tar.zst
+          name: gradle-cache-part-01
+          path: gradle-cache-part-01
           compression-level: 0
           retention-days: 2
 
-      - name: Upload JDK 17
+      - name: Upload Gradle cache part 02
         uses: actions/upload-artifact@v4
         with:
-          name: jdk17-temurin
-          path: jdk17-temurin.tar.zst
-          compression-level: 0
-          retention-days: 2
-
-      - name: Upload current Travel SDK AAR
-        uses: actions/upload-artifact@v4
-        with:
-          name: travel-sdk-current-aar
-          path: travel-sdk/travel-sdk-release.aar
+          name: gradle-cache-part-02
+          path: gradle-cache-part-02
+          if-no-files-found: ignore
           compression-level: 0
           retention-days: 2
