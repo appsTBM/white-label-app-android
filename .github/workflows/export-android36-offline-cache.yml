@@ -1,4 +1,4 @@
-name: Export Android 36 Offline Cache
+name: Export Android Build Tools 35
 
 on:
   push:
@@ -13,51 +13,24 @@ permissions:
   contents: read
 
 jobs:
-  export-cache:
+  export-build-tools:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Restore JDK and Gradle cache
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-          cache: gradle
-
-      - name: Package and split Gradle cache
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install and package Build Tools 35
         run: |
-          du -sh "$HOME/.gradle" || true
-          tar -C "$HOME" --use-compress-program='zstd -3 -T0' -cf gradle-offline-cache.tar.zst \
-            .gradle/caches \
-            .gradle/wrapper/dists
-          split -b 450M -d -a 2 gradle-offline-cache.tar.zst gradle-cache-part-
-          ls -lh gradle-cache-part-*
-
-      - name: Upload Gradle cache part 00
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "build-tools;35.0.0"
+          tar -C "$ANDROID_SDK_ROOT" --use-compress-program='zstd -3 -T0' -cf android-build-tools-35.tar.zst build-tools/35.0.0
+          ls -lh android-build-tools-35.tar.zst
+      - name: Upload Build Tools 35
         uses: actions/upload-artifact@v4
         with:
-          name: gradle-cache-part-00
-          path: gradle-cache-part-00
-          compression-level: 0
-          retention-days: 2
-
-      - name: Upload Gradle cache part 01
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-cache-part-01
-          path: gradle-cache-part-01
-          compression-level: 0
-          retention-days: 2
-
-      - name: Upload Gradle cache part 02
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-cache-part-02
-          path: gradle-cache-part-02
-          if-no-files-found: ignore
+          name: android-build-tools-35
+          path: android-build-tools-35.tar.zst
           compression-level: 0
           retention-days: 2
