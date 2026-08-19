@@ -1,0 +1,103 @@
+name: Export Android 36 Offline Cache
+
+on:
+  push:
+    branches:
+      - ci-export-android36-cache
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-cache:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android API 36
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Prime current Android 16 dependencies
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('gradle/libs.versions.toml')
+          s = p.read_text()
+          s = s.replace('version = "1.12.0"', 'version = "1.14.0"')
+          p.write_text(s)
+          p = Path('app/build.gradle.kts')
+          s = p.read_text()
+          if 'androidx.activity:activity-ktx:1.13.0' not in s:
+              s = s.replace('// AndroidX', '// AndroidX\n    implementation("androidx.activity:activity-ktx:1.13.0")')
+          p.write_text(s)
+          PY
+          keytool -genkeypair -v \
+            -keystore debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -keyalg RSA -keysize 2048 -validity 10000
+          cat > signing.properties <<'EOF'
+          KEYSTORE_FILE_DEBUG=debug.keystore
+          KEYSTORE_FILE_PASSWORD_DEBUG=android
+          KEY_ALIAS_DEBUG=androiddebugkey
+          KEY_PASSWORD_DEBUG=android
+          KEYSTORE_FILE_RELEASE=debug.keystore
+          KEYSTORE_FILE_PASSWORD_RELEASE=android
+          KEY_ALIAS_RELEASE=androiddebugkey
+          KEY_PASSWORD_RELEASE=android
+          EOF
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace assembleDebug
+
+      - name: Package Gradle dependency cache
+        run: |
+          tar -C "$HOME" --use-compress-program='zstd -3 -T0' -cf gradle-offline-cache.tar.zst \
+            .gradle/caches \
+            .gradle/wrapper/dists
+          ls -lh gradle-offline-cache.tar.zst
+
+      - name: Package minimal Android SDK 36
+        run: |
+          tar -C "$ANDROID_SDK_ROOT" --use-compress-program='zstd -3 -T0' -cf android-sdk36-minimal.tar.zst \
+            platforms/android-36 \
+            build-tools/36.0.0 \
+            platform-tools \
+            licenses \
+            cmdline-tools
+          ls -lh android-sdk36-minimal.tar.zst
+
+      - name: Upload Gradle cache
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-offline-cache-api36
+          path: gradle-offline-cache.tar.zst
+          compression-level: 0
+          retention-days: 2
+
+      - name: Upload Android SDK 36
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-sdk36-minimal
+          path: android-sdk36-minimal.tar.zst
+          compression-level: 0
+          retention-days: 2
